@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Dragon Starlink Dashboard</title>
+
+    <style>
+        :root {
+            --dragon-blue: #0f2a60;
+            --footer-cover-height: 36px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: var(--dragon-blue);
+            overflow: hidden;
+        }
+
+        /* 登入畫面 */
+        #loginOverlay {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+            background-color: var(--dragon-blue);
+        }
+
+        #loginBox {
+            width: 320px;
+            max-width: 100%;
+            padding: 32px;
+            background-color: #fff;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+        }
+
+        #loginBox h2 {
+            margin: 0 0 10px;
+            color: var(--dragon-blue);
+            font-size: 22px;
+        }
+
+        #loginBox p {
+            margin: 0 0 20px;
+            color: #555;
+            font-size: 14px;
+        }
+
+        #passwordInput {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #aaa;
+            border-radius: 6px;
+            font-size: 16px;
+            outline: none;
+        }
+
+        #passwordInput:focus {
+            border-color: var(--dragon-blue);
+        }
+
+        #loginButton {
+            width: 100%;
+            margin-top: 15px;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            background-color: var(--dragon-blue);
+            color: #fff;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        #loginButton:hover {
+            background-color: #173b82;
+        }
+
+        #errorMessage {
+            min-height: 20px;
+            margin-top: 12px;
+            color: #c62828;
+            font-size: 14px;
+        }
+
+        /*
+         * 登入後的主畫面：iframe 滿版，底部工具列直接覆蓋 iframe。
+         * 重要：不能讓工具列另外佔用一行，否則會露出
+         * Power BI 原生的灰色 Microsoft Power BI / 分享工具列。
+         */
+        #mainContent {
+            display: none;
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+        }
+
+        #iframeContainer {
+            position: absolute;
+            inset: 0;
+            padding: 8px 8px 0;
+            overflow: hidden;
+        }
+
+        #myIframe {
+            display: block;
+            width: 100%;
+            height: 100%;
+            border: none;
+            background-color: #fff;
+        }
+
+        /*
+         * 藍色工具列覆蓋 iframe 最下方的 Power BI 品牌／分享列。
+         * 高度約 36px（貼近原始版本），不要蓋住它上方的
+         * Power BI 縮放控制列（－、滑桿、＋、百分比、全螢幕）。
+         * 如果 Power BI 日後改變工具列尺寸，只需調整 --footer-cover-height。
+         */
+        #bottomToolbar {
+            position: absolute;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            height: calc(var(--footer-cover-height) + env(safe-area-inset-bottom));
+            padding: 4px 10px calc(4px + env(safe-area-inset-bottom));
+            background-color: var(--dragon-blue);
+        }
+
+        .toolbarGroup {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+        }
+
+        .toolbarButton {
+            height: 28px;
+            min-height: 28px;
+            padding: 3px 10px;
+            border: 1px solid rgba(255, 255, 255, 0.45);
+            border-radius: 7px;
+            background: transparent;
+            color: #fff;
+            font-size: 13px;
+            line-height: 20px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .toolbarButton:hover {
+            background-color: #20447f;
+        }
+
+        .modeButton[aria-pressed="true"] {
+            background-color: #fff;
+            border-color: #fff;
+            color: var(--dragon-blue);
+        }
+
+        .modeButton[aria-pressed="true"]:hover {
+            background-color: #eef2f8;
+        }
+
+        .toolbarButton:focus-visible,
+        #loginButton:focus-visible {
+            outline: 2px solid #72b9ff;
+            outline-offset: 2px;
+        }
+
+        /* 小螢幕縮小底部按鈕，避免擠在一起 */
+        @media (max-width: 480px) {
+            #bottomToolbar {
+                gap: 4px;
+                padding-right: 7px;
+                padding-left: 7px;
+            }
+
+            .toolbarGroup {
+                gap: 4px;
+            }
+
+            .toolbarButton {
+                padding: 3px 7px;
+                font-size: 12px;
+            }
+
+            #iframeContainer {
+                padding: 5px 5px 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 統一的密碼登入畫面 -->
+    <div id="loginOverlay">
+        <form id="loginBox">
+            <h2>Dragon Starlink Dashboard</h2>
+            <p>Please enter the password to continue.</p>
+            <input
+                type="password"
+                id="passwordInput"
+                placeholder="Password"
+                autocomplete="current-password"
+                aria-label="Password"
+            >
+            <button id="loginButton" type="submit">Login</button>
+            <div id="errorMessage" role="alert"></div>
+        </form>
+    </div>
+
+    <!-- 登入後載入報表；藍色工具列僅遮住 Power BI 品牌／分享列，保留上方縮放列 -->
+    <main id="mainContent">
+        <div id="iframeContainer">
+            <iframe
+                id="myIframe"
+                title="Dragon Starlink Power BI Report"
+                allowfullscreen
+            ></iframe>
+        </div>
+
+        <footer id="bottomToolbar">
+            <div class="toolbarGroup" aria-label="Report view">
+                <button type="button" id="mobileButton" class="toolbarButton modeButton" aria-pressed="false">Mobile</button>
+                <button type="button" id="desktopButton" class="toolbarButton modeButton" aria-pressed="false">Desktop</button>
+            </div>
+            <div class="toolbarGroup">
+                <button type="button" id="refreshButton" class="toolbarButton">Refresh ⟳</button>
+                <button type="button" id="logoutButton" class="toolbarButton">Logout</button>
+            </div>
+        </footer>
+    </main>
+
+    <script>
+        // 1. 禁止在本網頁開啟滑鼠右鍵選單
+        document.addEventListener("contextmenu", function(event) {
+            event.preventDefault();
+        });
+
+        // 2. 嘗試攔截常見的檢視原始碼、開發者工具和儲存網頁快捷鍵
+        // 注意：瀏覽器保留的快捷鍵、瀏覽器選單及跨來源 Power BI iframe
+        // 可能不受此程式控制；本功能無法提供真正的原始碼保護。
+        document.addEventListener("keydown", function(event) {
+            const key = event.key.toLowerCase();
+            const ctrl = event.ctrlKey;
+            const shift = event.shiftKey;
+            const alt = event.altKey;
+
+            const blockF12 = key === "f12" || event.keyCode === 123;
+            const blockViewSourceOrSave = ctrl && !shift && !alt &&
+                (key === "u" || key === "s");         // Ctrl + U、Ctrl + S
+            const blockDevTools = ctrl && shift && !alt &&
+                (key === "i" || key === "j" || key === "c"); // Ctrl + Shift + I/J/C
+
+            if (blockF12 || blockViewSourceOrSave || blockDevTools) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+        }, true);
+
+        // 沿用原本的共用密碼（注意：前端密碼無法提供真正的存取安全）
+        const correctPassword = "Dragon";
+
+        // 兩個 Power BI 報表網址
+        const reportUrls = {
+            desktop: "https://reurl.cc/VnZjpQ",
+            mobile: "https://reurl.cc/k9bVpn"
+        };
+
+        const authKey = "voyageAuthenticated";
+        const modeKey = "dragonStarlinkDisplayMode";
+        const mobileMedia = window.matchMedia("(max-width: 767px)");
+
+        const loginOverlay = document.getElementById("loginOverlay");
+        const loginBox = document.getElementById("loginBox");
+        const mainContent = document.getElementById("mainContent");
+        const passwordInput = document.getElementById("passwordInput");
+        const errorMessage = document.getElementById("errorMessage");
+        const iframe = document.getElementById("myIframe");
+        const mobileButton = document.getElementById("mobileButton");
+        const desktopButton = document.getElementById("desktopButton");
+
+        let currentMode = null;
+
+        // 依瀏覽器的可用寬度判斷，適用於手機、平板及電腦
+        function detectDisplayMode() {
+            return mobileMedia.matches ? "mobile" : "desktop";
+        }
+
+        // 手動切換時記住選擇，同一個分頁重新整理仍維持該模式
+        function setDisplayMode(mode, manual = false) {
+            if (!Object.prototype.hasOwnProperty.call(reportUrls, mode)) {
+                return;
+            }
+
+            if (manual) {
+                sessionStorage.setItem(modeKey, mode);
+            }
+
+            currentMode = mode;
+            mobileButton.setAttribute("aria-pressed", String(mode === "mobile"));
+            desktopButton.setAttribute("aria-pressed", String(mode === "desktop"));
+
+            // 只有切換報表時才變更網址，避免重複載入
+            if (iframe.getAttribute("src") !== reportUrls[mode]) {
+                iframe.src = reportUrls[mode];
+            }
+        }
+
+        function showMainContent() {
+            loginOverlay.style.display = "none";
+            mainContent.style.display = "block";
+
+            const savedMode = sessionStorage.getItem(modeKey);
+            const mode = savedMode === "mobile" || savedMode === "desktop"
+                ? savedMode
+                : detectDisplayMode();
+
+            setDisplayMode(mode);
+        }
+
+        // 統一登入
+        loginBox.addEventListener("submit", function(event) {
+            event.preventDefault();
+
+            if (passwordInput.value === correctPassword) {
+                sessionStorage.setItem(authKey, "true");
+                errorMessage.textContent = "";
+                passwordInput.value = "";
+                showMainContent();
+            } else {
+                errorMessage.textContent = "Incorrect password. Please try again.";
+                passwordInput.value = "";
+                passwordInput.focus();
+            }
+        });
+
+        // 左下角手動切換 Mobile / Desktop，不必重新登入
+        mobileButton.addEventListener("click", function() {
+            setDisplayMode("mobile", true);
+        });
+
+        desktopButton.addEventListener("click", function() {
+            setDisplayMode("desktop", true);
+        });
+
+        // Refresh：重新載入目前選擇的報表，不重新登入
+        document.getElementById("refreshButton").addEventListener("click", function() {
+            if (currentMode) {
+                iframe.src = reportUrls[currentMode];
+            }
+        });
+
+        // Logout：清除登入狀態及手動選擇，下次登入重新自動判斷
+        document.getElementById("logoutButton").addEventListener("click", function() {
+            sessionStorage.removeItem(authKey);
+            sessionStorage.removeItem(modeKey);
+
+            mainContent.style.display = "none";
+            iframe.src = "about:blank";
+            currentMode = null;
+            loginOverlay.style.display = "flex";
+            passwordInput.value = "";
+            errorMessage.textContent = "";
+            passwordInput.focus();
+        });
+
+        // 未手動指定時，旋轉手機或調整視窗大小會自動切換
+        function handleScreenChange() {
+            if (sessionStorage.getItem(authKey) === "true" &&
+                !sessionStorage.getItem(modeKey)) {
+                setDisplayMode(detectDisplayMode());
+            }
+        }
+
+        if (typeof mobileMedia.addEventListener === "function") {
+            mobileMedia.addEventListener("change", handleScreenChange);
+        } else {
+            // 相容較舊的 Safari
+            mobileMedia.addListener(handleScreenChange);
+        }
+
+        // 同一個分頁已登入就直接顯示；否則要求輸入密碼
+        if (sessionStorage.getItem(authKey) === "true") {
+            showMainContent();
+        } else {
+            passwordInput.focus();
+        }
+    </script>
+</body>
+</html>
