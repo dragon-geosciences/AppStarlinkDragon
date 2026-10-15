@@ -246,7 +246,8 @@
             </div>
             <div class="toolbarGroup">
                 <button type="button" id="refreshButton" class="toolbarButton">Refresh ⟳</button>
-                <button type="button" id="logoutButton" class="toolbarButton">Logout</button>
+                // <button type="button" id="logoutButton" class="toolbarButton">Logout</button>
+                <button type="button" id="logoutButton" class="toolbarButton" style="display: none;">Logout</button>
             </div>
         </footer>
     </main>
@@ -399,13 +400,18 @@
             // 相容較舊的 Safari
             mobileMedia.addListener(handleScreenChange);
         }
-
+        
+        //下面註解掉改為不需要登入
         // 同一個分頁已登入就直接顯示；否則要求輸入密碼
-        if (sessionStorage.getItem(authKey) === "true") {
-            showMainContent();
-        } else {
-            passwordInput.focus();
-        }
+        //if (sessionStorage.getItem(authKey) === "true") {
+            //showMainContent();
+        //} else {
+            //passwordInput.focus();
+        //}
+        // 不需登入，直接顯示主畫面
+        sessionStorage.setItem(authKey, "true");
+        showMainContent();
+        
     </script>
 </body>
 </html>
